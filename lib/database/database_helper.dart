@@ -1,0 +1,228 @@
+import 'dart:async';
+import 'package:sqflite/sqflite.dart' as sqlite;
+import 'package:path/path.dart';
+import '../models/transaction.dart' as models;
+import '../models/category.dart';
+import '../models/monthly_balance.dart';
+
+class DatabaseHelper {
+  static final DatabaseHelper _instance = DatabaseHelper._internal();
+  factory DatabaseHelper() => _instance;
+  DatabaseHelper._internal();
+
+  static sqlite.Database? _database;
+
+  Future<sqlite.Database> get database async {
+    if (_database != null) return _database!;
+    _database = await _initDatabase();
+    return _database!;
+  }
+
+  Future<sqlite.Database> _initDatabase() async {
+    String path = join(await sqlite.getDatabasesPath(), 'expense_tracker.db');
+    return await sqlite.openDatabase(
+      path,
+      version: 1,
+      onCreate: _onCreate,
+    );
+  }
+
+  Future<void> _onCreate(sqlite.Database db, int version) async {
+    // Create transactions table
+    await db.execute('''
+      CREATE TABLE transactions(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        amount REAL NOT NULL,
+        category TEXT NOT NULL,
+        dateTime INTEGER NOT NULL,
+        isTiffin INTEGER NOT NULL DEFAULT 0,
+        monthYear TEXT NOT NULL
+      )
+    ''');
+
+    // Create categories table
+    await db.execute('''
+      CREATE TABLE categories(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL UNIQUE,
+        isDefault INTEGER NOT NULL DEFAULT 0,
+        color TEXT NOT NULL DEFAULT '#2196F3'
+      )
+    ''');
+
+    // Create monthly_balances table
+    await db.execute('''
+      CREATE TABLE monthly_balances(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        monthYear TEXT NOT NULL UNIQUE,
+        initialBalance REAL NOT NULL,
+        createdAt INTEGER NOT NULL
+      )
+    ''');
+
+    // Insert default categories
+    await _insertDefaultCategories(db);
+  }
+
+  Future<void> _insertDefaultCategories(sqlite.Database db) async {
+    final defaultCategories = [
+      {'name': 'Travel', 'isDefault': 1, 'color': '#FF5722'},
+      {'name': 'Food', 'isDefault': 1, 'color': '#4CAF50'},
+      {'name': 'Misc', 'isDefault': 1, 'color': '#9C27B0'},
+    ];
+
+    for (var category in defaultCategories) {
+      await db.insert('categories', category);
+    }
+  }
+
+  // Transaction CRUD operations
+  Future<int> insertTransaction(models.Transaction transaction) async {
+    final db = await database;
+    return await db.insert('transactions', transaction.toMap());
+  }
+
+  Future<List<models.Transaction>> getTransactions(String monthYear) async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'transactions',
+      where: 'monthYear = ?',
+      whereArgs: [monthYear],
+      orderBy: 'dateTime DESC',
+    );
+    return List.generate(maps.length, (i) => models.Transaction.fromMap(maps[i]));
+  }
+
+  Future<List<models.Transaction>> getAllTransactions() async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'transactions',
+      orderBy: 'dateTime DESC',
+    );
+    return List.generate(maps.length, (i) => models.Transaction.fromMap(maps[i]));
+  }
+
+  Future<int> updateTransaction(models.Transaction transaction) async {
+    final db = await database;
+    return await db.update(
+      'transactions',
+      transaction.toMap(),
+      where: 'id = ?',
+      whereArgs: [transaction.id],
+    );
+  }
+
+  Future<int> deleteTransaction(int id) async {
+    final db = await database;
+    return await db.delete(
+      'transactions',
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
+  // Category CRUD operations
+  Future<int> insertCategory(Category category) async {
+    final db = await database;
+    return await db.insert('categories', category.toMap());
+  }
+
+  Future<List<Category>> getCategories() async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'categories',
+      orderBy: 'isDefault DESC, name ASC',
+    );
+    return List.generate(maps.length, (i) => Category.fromMap(maps[i]));
+  }
+
+  Future<int> updateCategory(Category category) async {
+    final db = await database;
+    return await db.update(
+      'categories',
+      category.toMap(),
+      where: 'id = ?',
+      whereArgs: [category.id],
+    );
+  }
+
+  Future<int> deleteCategory(int id) async {
+    final db = await database;
+    return await db.delete(
+      'categories',
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
+  // Monthly Balance operations
+  Future<int> insertMonthlyBalance(MonthlyBalance monthlyBalance) async {
+    final db = await database;
+    return await db.insert('monthly_balances', monthlyBalance.toMap());
+  }
+
+  Future<MonthlyBalance?> getMonthlyBalance(String monthYear) async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'monthly_balances',
+      where: 'monthYear = ?',
+      whereArgs: [monthYear],
+    );
+    if (maps.isNotEmpty) {
+      return MonthlyBalance.fromMap(maps.first);
+    }
+    return null;
+  }
+
+  Future<int> updateMonthlyBalance(MonthlyBalance monthlyBalance) async {
+    final db = await database;
+    return await db.update(
+      'monthly_balances',
+      monthlyBalance.toMap(),
+      where: 'monthYear = ?',
+      whereArgs: [monthlyBalance.monthYear],
+    );
+  }
+
+  // Utility methods
+  Future<double> getTotalExpenses(String monthYear) async {
+    final db = await database;
+    final result = await db.rawQuery(
+      'SELECT SUM(amount) as total FROM transactions WHERE monthYear = ?',
+      [monthYear],
+    );
+    return (result.first['total'] as num?)?.toDouble() ?? 0.0;
+  }
+
+  Future<double> getTiffinExpenses(String monthYear) async {
+    final db = await database;
+    final result = await db.rawQuery(
+      'SELECT SUM(amount) as total FROM transactions WHERE monthYear = ? AND isTiffin = 1',
+      [monthYear],
+    );
+    return (result.first['total'] as num?)?.toDouble() ?? 0.0;
+  }
+
+  Future<Map<String, double>> getCategoryExpenses(String monthYear) async {
+    final db = await database;
+    final result = await db.rawQuery(
+      'SELECT category, SUM(amount) as total FROM transactions WHERE monthYear = ? GROUP BY category',
+      [monthYear],
+    );
+    
+    Map<String, double> categoryExpenses = {};
+    for (var row in result) {
+      categoryExpenses[row['category'] as String] = (row['total'] as num).toDouble();
+    }
+    return categoryExpenses;
+  }
+
+  Future<List<String>> getAvailableMonths() async {
+    final db = await database;
+    final result = await db.rawQuery(
+      'SELECT DISTINCT monthYear FROM transactions ORDER BY monthYear DESC',
+    );
+    return result.map((row) => row['monthYear'] as String).toList();
+  }
+}

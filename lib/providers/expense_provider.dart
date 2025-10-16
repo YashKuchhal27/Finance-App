@@ -6,7 +6,7 @@ import '../database/database_helper.dart';
 
 class ExpenseProvider with ChangeNotifier {
   final DatabaseHelper _databaseHelper = DatabaseHelper();
-  
+
   List<Transaction> _transactions = [];
   List<models.Category> _categories = [];
   MonthlyBalance? _currentMonthlyBalance;
@@ -24,11 +24,12 @@ class ExpenseProvider with ChangeNotifier {
   Future<void> initialize() async {
     _isLoading = true;
     notifyListeners();
-    
+
     await _loadCategories();
     await _setCurrentMonth();
+    await _ensureCurrentMonthBalance();
     await _loadCurrentMonthData();
-    
+
     _isLoading = false;
     notifyListeners();
   }
@@ -47,17 +48,46 @@ class ExpenseProvider with ChangeNotifier {
   // Load current month data
   Future<void> _loadCurrentMonthData() async {
     _transactions = await _databaseHelper.getTransactions(_currentMonthYear);
-    _currentMonthlyBalance = await _databaseHelper.getMonthlyBalance(_currentMonthYear);
+    _currentMonthlyBalance =
+        await _databaseHelper.getMonthlyBalance(_currentMonthYear);
+  }
+
+  // Ensure current month has a balance initialized with 10000 + carry-forward from previous month
+  Future<void> _ensureCurrentMonthBalance() async {
+    final existing = await _databaseHelper.getMonthlyBalance(_currentMonthYear);
+    if (existing != null) return;
+
+    final now = DateTime.now();
+    final prev = DateTime(now.year, now.month - 1, 1);
+    final prevMonthYear =
+        '${prev.year}-${prev.month.toString().padLeft(2, '0')}';
+
+    double carryForward = 0.0;
+    final prevBalance = await _databaseHelper.getMonthlyBalance(prevMonthYear);
+    if (prevBalance != null) {
+      final prevExpenses =
+          await _databaseHelper.getTotalExpenses(prevMonthYear);
+      final remaining = prevBalance.initialBalance - prevExpenses;
+      if (remaining > 0) carryForward = remaining;
+    }
+
+    final initial = 10000.0 + carryForward;
+    final monthlyBalance = MonthlyBalance(
+      monthYear: _currentMonthYear,
+      initialBalance: initial,
+      createdAt: DateTime.now(),
+    );
+    await _databaseHelper.insertMonthlyBalance(monthlyBalance);
   }
 
   // Switch to different month
   Future<void> switchToMonth(String monthYear) async {
     _isLoading = true;
     notifyListeners();
-    
+
     _currentMonthYear = monthYear;
     await _loadCurrentMonthData();
-    
+
     _isLoading = false;
     notifyListeners();
   }
@@ -67,11 +97,6 @@ class ExpenseProvider with ChangeNotifier {
     try {
       // Validate category exists
       if (!_categories.any((cat) => cat.name == transaction.category)) {
-        return false;
-      }
-
-      // Check if we can add more custom categories
-      if (!_isDefaultCategory(transaction.category) && _getCustomCategoryCount() >= 5) {
         return false;
       }
 
@@ -163,7 +188,7 @@ class ExpenseProvider with ChangeNotifier {
         initialBalance: balance,
         createdAt: DateTime.now(),
       );
-      
+
       await _databaseHelper.insertMonthlyBalance(monthlyBalance);
       await _loadCurrentMonthData();
       notifyListeners();
@@ -199,7 +224,8 @@ class ExpenseProvider with ChangeNotifier {
 
   // Get total expenses for current month
   double getTotalExpenses() {
-    return _transactions.fold(0.0, (sum, transaction) => sum + transaction.amount);
+    return _transactions.fold(
+        0.0, (sum, transaction) => sum + transaction.amount);
   }
 
   // Get tiffin expenses for current month
@@ -213,7 +239,7 @@ class ExpenseProvider with ChangeNotifier {
   Map<String, double> getCategoryExpenses() {
     Map<String, double> categoryExpenses = {};
     for (var transaction in _transactions) {
-      categoryExpenses[transaction.category] = 
+      categoryExpenses[transaction.category] =
           (categoryExpenses[transaction.category] ?? 0.0) + transaction.amount;
     }
     return categoryExpenses;
@@ -237,8 +263,8 @@ class ExpenseProvider with ChangeNotifier {
   List<Transaction> getTransactionsForDay(DateTime date) {
     return _transactions.where((transaction) {
       return transaction.dateTime.year == date.year &&
-             transaction.dateTime.month == date.month &&
-             transaction.dateTime.day == date.day;
+          transaction.dateTime.month == date.month &&
+          transaction.dateTime.day == date.day;
     }).toList();
   }
 

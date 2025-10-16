@@ -4,6 +4,7 @@ import 'package:path/path.dart';
 import '../models/transaction.dart' as models;
 import '../models/category.dart';
 import '../models/monthly_balance.dart';
+import '../utils/security_helper.dart';
 
 class DatabaseHelper {
   static final DatabaseHelper _instance = DatabaseHelper._internal();
@@ -80,7 +81,12 @@ class DatabaseHelper {
   // Transaction CRUD operations
   Future<int> insertTransaction(models.Transaction transaction) async {
     final db = await database;
-    return await db.insert('transactions', transaction.toMap());
+    // Encrypt sensitive fields (name) before insert
+    final map = transaction.toMap();
+    final encryptedName =
+        await SecurityHelper.encryptData(map['name'] as String);
+    map['name'] = encryptedName;
+    return await db.insert('transactions', map);
   }
 
   Future<List<models.Transaction>> getTransactions(String monthYear) async {
@@ -91,7 +97,17 @@ class DatabaseHelper {
       whereArgs: [monthYear],
       orderBy: 'dateTime DESC',
     );
-    return List.generate(maps.length, (i) => models.Transaction.fromMap(maps[i]));
+    // Decrypt names after fetch
+    final List<Map<String, dynamic>> decrypted = [];
+    for (final row in maps) {
+      final copy = Map<String, dynamic>.from(row);
+      final encName = copy['name'] as String;
+      final decName = await SecurityHelper.decryptData(encName);
+      copy['name'] = decName;
+      decrypted.add(copy);
+    }
+    return List.generate(
+        decrypted.length, (i) => models.Transaction.fromMap(decrypted[i]));
   }
 
   Future<List<models.Transaction>> getAllTransactions() async {
@@ -100,14 +116,28 @@ class DatabaseHelper {
       'transactions',
       orderBy: 'dateTime DESC',
     );
-    return List.generate(maps.length, (i) => models.Transaction.fromMap(maps[i]));
+    final List<Map<String, dynamic>> decrypted = [];
+    for (final row in maps) {
+      final copy = Map<String, dynamic>.from(row);
+      final encName = copy['name'] as String;
+      final decName = await SecurityHelper.decryptData(encName);
+      copy['name'] = decName;
+      decrypted.add(copy);
+    }
+    return List.generate(
+        decrypted.length, (i) => models.Transaction.fromMap(decrypted[i]));
   }
 
   Future<int> updateTransaction(models.Transaction transaction) async {
     final db = await database;
+    // Encrypt name before update
+    final map = transaction.toMap();
+    final encryptedName =
+        await SecurityHelper.encryptData(map['name'] as String);
+    map['name'] = encryptedName;
     return await db.update(
       'transactions',
-      transaction.toMap(),
+      map,
       where: 'id = ?',
       whereArgs: [transaction.id],
     );
@@ -210,10 +240,11 @@ class DatabaseHelper {
       'SELECT category, SUM(amount) as total FROM transactions WHERE monthYear = ? GROUP BY category',
       [monthYear],
     );
-    
+
     Map<String, double> categoryExpenses = {};
     for (var row in result) {
-      categoryExpenses[row['category'] as String] = (row['total'] as num).toDouble();
+      categoryExpenses[row['category'] as String] =
+          (row['total'] as num).toDouble();
     }
     return categoryExpenses;
   }
@@ -221,7 +252,7 @@ class DatabaseHelper {
   Future<List<String>> getAvailableMonths() async {
     final db = await database;
     final result = await db.rawQuery(
-      'SELECT DISTINCT monthYear FROM transactions ORDER BY monthYear DESC',
+      'SELECT monthYear FROM (\n         SELECT DISTINCT monthYear FROM transactions\n         UNION\n         SELECT DISTINCT monthYear FROM monthly_balances\n       ) ORDER BY monthYear DESC',
     );
     return result.map((row) => row['monthYear'] as String).toList();
   }

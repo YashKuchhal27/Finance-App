@@ -25,13 +25,13 @@ class SecurityHelper {
   // Initialize security settings
   static Future<void> initializeSecurity() async {
     final prefs = await SharedPreferences.getInstance();
-    
+
     // Generate and store salt if not exists
     if (!prefs.containsKey(_saltKey)) {
       final salt = _generateSalt();
       await prefs.setString(_saltKey, salt);
     }
-    
+
     // Generate and store encryption key if not exists
     if (!prefs.containsKey(_encryptionKey)) {
       final salt = prefs.getString(_saltKey) ?? _generateSalt();
@@ -51,11 +51,11 @@ class SecurityHelper {
     final textBytes = utf8.encode(text);
     final keyBytes = utf8.encode(key);
     final encrypted = <int>[];
-    
+
     for (int i = 0; i < textBytes.length; i++) {
       encrypted.add(textBytes[i] ^ keyBytes[i % keyBytes.length]);
     }
-    
+
     return base64Encode(encrypted);
   }
 
@@ -64,11 +64,11 @@ class SecurityHelper {
     final encryptedBytes = base64Decode(encryptedText);
     final keyBytes = utf8.encode(key);
     final decrypted = <int>[];
-    
+
     for (int i = 0; i < encryptedBytes.length; i++) {
       decrypted.add(encryptedBytes[i] ^ keyBytes[i % keyBytes.length]);
     }
-    
+
     return utf8.decode(decrypted);
   }
 
@@ -100,9 +100,9 @@ class SecurityHelper {
 
   // Sanitize input to prevent injection attacks
   static String sanitizeInput(String input) {
-    return input
-        .replaceAll(RegExp(r'[<>"\'']'), '') // Remove potentially dangerous characters
-        .trim();
+    // Remove common dangerous characters while keeping most user text intact
+    final sanitized = input.replaceAll(RegExp(r'[<>"\' + "'" + r']'), '');
+    return sanitized.trim();
   }
 
   // Validate amount input
@@ -127,24 +127,25 @@ class SecurityHelper {
       RegExp(r'onload=', caseSensitive: false),
       RegExp(r'onerror=', caseSensitive: false),
     ];
-    
+
     return suspiciousPatterns.any((pattern) => pattern.hasMatch(input));
   }
 
   // Rate limiting for transaction additions
   static final Map<String, List<DateTime>> _rateLimitMap = {};
-  
-  static bool isRateLimited(String userId, {int maxRequests = 10, Duration window = const Duration(minutes: 1)}) {
+
+  static bool isRateLimited(String userId,
+      {int maxRequests = 10, Duration window = const Duration(minutes: 1)}) {
     final now = DateTime.now();
     final userRequests = _rateLimitMap[userId] ?? [];
-    
+
     // Remove old requests outside the window
     userRequests.removeWhere((time) => now.difference(time) > window);
-    
+
     if (userRequests.length >= maxRequests) {
       return true;
     }
-    
+
     userRequests.add(now);
     _rateLimitMap[userId] = userRequests;
     return false;
@@ -155,5 +156,3 @@ class SecurityHelper {
     _rateLimitMap.clear();
   }
 }
-
-

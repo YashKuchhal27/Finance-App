@@ -6,6 +6,7 @@ class Transaction {
   final DateTime dateTime;
   final bool isTiffin;
   final String monthYear;
+  final String? receiptPath; // local file path to receipt image
 
   Transaction({
     this.id,
@@ -15,6 +16,7 @@ class Transaction {
     required this.dateTime,
     this.isTiffin = false,
     required this.monthYear,
+    this.receiptPath,
   });
 
   Map<String, dynamic> toMap() {
@@ -26,6 +28,7 @@ class Transaction {
       'dateTime': dateTime.millisecondsSinceEpoch,
       'isTiffin': isTiffin ? 1 : 0,
       'monthYear': monthYear,
+      'receiptPath': receiptPath,
     };
   }
 
@@ -38,6 +41,7 @@ class Transaction {
       dateTime: DateTime.fromMillisecondsSinceEpoch(map['dateTime']),
       isTiffin: map['isTiffin'] == 1,
       monthYear: map['monthYear'],
+      receiptPath: map['receiptPath'] as String?,
     );
   }
 
@@ -49,6 +53,7 @@ class Transaction {
     DateTime? dateTime,
     bool? isTiffin,
     String? monthYear,
+    String? receiptPath,
   }) {
     return Transaction(
       id: id ?? this.id,
@@ -58,8 +63,7 @@ class Transaction {
       dateTime: dateTime ?? this.dateTime,
       isTiffin: isTiffin ?? this.isTiffin,
       monthYear: monthYear ?? this.monthYear,
+      receiptPath: receiptPath ?? this.receiptPath,
     );
   }
 }
-
-

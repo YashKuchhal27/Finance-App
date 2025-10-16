@@ -3,6 +3,8 @@ import '../models/transaction.dart';
 import '../models/category.dart' as models;
 import '../models/monthly_balance.dart';
 import '../database/database_helper.dart';
+import '../models/budget.dart';
+import '../models/recurring_transaction.dart';
 
 class ExpenseProvider with ChangeNotifier {
   final DatabaseHelper _databaseHelper = DatabaseHelper();
@@ -12,6 +14,8 @@ class ExpenseProvider with ChangeNotifier {
   MonthlyBalance? _currentMonthlyBalance;
   String _currentMonthYear = '';
   bool _isLoading = false;
+  Budget? _currentBudget;
+  List<RecurringTransaction> _recurringTransactions = [];
 
   // Getters
   List<Transaction> get transactions => _transactions;
@@ -19,6 +23,8 @@ class ExpenseProvider with ChangeNotifier {
   MonthlyBalance? get currentMonthlyBalance => _currentMonthlyBalance;
   String get currentMonthYear => _currentMonthYear;
   bool get isLoading => _isLoading;
+  Budget? get currentBudget => _currentBudget;
+  List<RecurringTransaction> get recurringTransactions => _recurringTransactions;
 
   // Initialize the provider
   Future<void> initialize() async {
@@ -29,6 +35,9 @@ class ExpenseProvider with ChangeNotifier {
     await _setCurrentMonth();
     await _ensureCurrentMonthBalance();
     await _loadCurrentMonthData();
+    await _loadBudget();
+    await _loadRecurringTransactions();
+    await _processRecurringTransactions();
 
     _isLoading = false;
     notifyListeners();
@@ -50,6 +59,48 @@ class ExpenseProvider with ChangeNotifier {
     _transactions = await _databaseHelper.getTransactions(_currentMonthYear);
     _currentMonthlyBalance =
         await _databaseHelper.getMonthlyBalance(_currentMonthYear);
+  }
+
+  Future<void> _loadBudget() async {
+    final raw = await _databaseHelper.getBudgetRaw(_currentMonthYear);
+    if (raw != null) {
+      _currentBudget = Budget.fromMap(raw);
+    } else {
+      _currentBudget = null;
+    }
+  }
+
+  Future<void> _loadRecurringTransactions() async {
+    final rawList = await _databaseHelper.getRecurringAll();
+    _recurringTransactions = rawList.map((map) => RecurringTransaction.fromMap(map)).toList();
+  }
+
+  Future<void> _processRecurringTransactions() async {
+    final now = DateTime.now();
+    final currentMonthYear = '${now.year}-${now.month.toString().padLeft(2, '0')}';
+    
+    for (final recurring in _recurringTransactions) {
+      if (recurring.nextRunAt.isBefore(now) || recurring.nextRunAt.isAtSameMomentAs(now)) {
+        // Create transaction for this month
+        final transaction = Transaction(
+          name: recurring.name,
+          amount: recurring.amount,
+          category: recurring.category,
+          dateTime: recurring.nextRunAt,
+          isTiffin: recurring.isTiffin,
+          monthYear: currentMonthYear,
+        );
+        
+        await addTransaction(transaction);
+        
+        // Update next run date
+        final updatedRecurring = recurring.copyWith(nextRunAt: recurring.calculateNextRun());
+        await _databaseHelper.updateRecurring(updatedRecurring.toMap(), recurring.id!);
+      }
+    }
+    
+    // Reload recurring transactions to get updated next run dates
+    await _loadRecurringTransactions();
   }
 
   // Ensure current month has a balance initialized with 10000 + carry-forward from previous month
@@ -87,6 +138,8 @@ class ExpenseProvider with ChangeNotifier {
 
     _currentMonthYear = monthYear;
     await _loadCurrentMonthData();
+    await _loadBudget();
+    await _loadRecurringTransactions();
 
     _isLoading = false;
     notifyListeners();
@@ -216,6 +269,69 @@ class ExpenseProvider with ChangeNotifier {
     }
   }
 
+  // Budgets API
+  Future<void> upsertBudget(
+      {required double totalLimit, bool rolloverEnabled = true}) async {
+    final budget = Budget(
+      monthYear: _currentMonthYear,
+      totalLimit: totalLimit,
+      rolloverEnabled: rolloverEnabled,
+      createdAt: DateTime.now(),
+    );
+    await _databaseHelper.upsertBudget(budget.toMap());
+    await _loadBudget();
+    notifyListeners();
+  }
+
+  double getSafeToSpend() {
+    final totalLimit = _currentBudget?.totalLimit;
+    if (totalLimit == null) return getCurrentBalance();
+    final remainingBudget = totalLimit - getTotalExpenses();
+    // Safe-to-spend is the min of cash balance and remaining budget
+    final cash = getCurrentBalance();
+    return remainingBudget < cash ? remainingBudget : cash;
+  }
+
+  bool isBudgetAlertThreshold(double thresholdPercent) {
+    if (_currentBudget == null || _currentBudget!.totalLimit <= 0) return false;
+    final used = getTotalExpenses() / _currentBudget!.totalLimit * 100.0;
+    return used >= thresholdPercent;
+  }
+
+  // Recurring transactions API
+  Future<bool> addRecurringTransaction(RecurringTransaction recurring) async {
+    try {
+      await _databaseHelper.insertRecurring(recurring.toMap());
+      await _loadRecurringTransactions();
+      notifyListeners();
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  Future<bool> updateRecurringTransaction(RecurringTransaction recurring) async {
+    try {
+      await _databaseHelper.updateRecurring(recurring.toMap(), recurring.id!);
+      await _loadRecurringTransactions();
+      notifyListeners();
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  Future<bool> deleteRecurringTransaction(int id) async {
+    try {
+      await _databaseHelper.deleteRecurring(id);
+      await _loadRecurringTransactions();
+      notifyListeners();
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
   // Get current balance
   double getCurrentBalance() {
     if (_currentMonthlyBalance == null) return 0.0;
@@ -251,10 +367,6 @@ class ExpenseProvider with ChangeNotifier {
   }
 
   // Helper methods
-  bool _isDefaultCategory(String categoryName) {
-    return _categories.any((cat) => cat.name == categoryName && cat.isDefault);
-  }
-
   int _getCustomCategoryCount() {
     return _categories.where((cat) => !cat.isDefault).length;
   }

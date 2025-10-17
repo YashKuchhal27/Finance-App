@@ -82,15 +82,17 @@ class _HomeScreenState extends State<HomeScreen> {
                   // Current Month Header
                   _buildMonthHeader(expenseProvider.currentMonthYear),
                   const SizedBox(height: 16),
-                  
+
                   // Balance Card
                   BalanceCard(
-                    initialBalance: expenseProvider.currentMonthlyBalance?.initialBalance ?? 0.0,
+                    initialBalance:
+                        expenseProvider.currentMonthlyBalance?.initialBalance ??
+                            0.0,
                     currentBalance: expenseProvider.getCurrentBalance(),
                     onSetBalance: () => _showSetBalanceDialog(expenseProvider),
                   ),
                   const SizedBox(height: 16),
-                  
+
                   // Quick Stats
                   QuickStatsCard(
                     totalExpenses: expenseProvider.getTotalExpenses(),
@@ -98,19 +100,21 @@ class _HomeScreenState extends State<HomeScreen> {
                     categoryExpenses: expenseProvider.getCategoryExpenses(),
                   ),
                   const SizedBox(height: 16),
-                  
+
                   // New Features Section
                   _buildNewFeaturesSection(expenseProvider),
                   const SizedBox(height: 16),
-                  
+
                   // Tiffin Tracker
                   TiffinTrackerCard(
-                    todayTiffin: expenseProvider.getTiffinForDay(DateTime.now()),
+                    todayTiffin:
+                        expenseProvider.getTiffinForDay(DateTime.now()),
                     monthlyTiffin: expenseProvider.getTiffinExpenses(),
-                    onAddTiffin: () => _navigateToAddTransaction(isTiffin: true),
+                    onAddTiffin: () =>
+                        _navigateToAddTransaction(isTiffin: true),
                   ),
                   const SizedBox(height: 16),
-                  
+
                   // Recent Transactions Header
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -136,11 +140,12 @@ class _HomeScreenState extends State<HomeScreen> {
                     ],
                   ),
                   const SizedBox(height: 8),
-                  
+
                   // Recent Transactions List
                   RecentTransactionsList(
                     transactions: expenseProvider.transactions.take(5).toList(),
-                    onTransactionTap: (transaction) => _showTransactionDetails(transaction),
+                    onTransactionTap: (transaction) =>
+                        _showTransactionDetails(transaction),
                   ),
                 ],
               ),
@@ -159,7 +164,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildMonthHeader(String monthYear) {
     final date = DateTime.parse('${monthYear}-01');
     final monthName = DateFormat('MMMM yyyy').format(date);
-    
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
@@ -233,7 +238,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _showSetBalanceDialog(ExpenseProvider expenseProvider) {
     final TextEditingController controller = TextEditingController();
-    
+
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -259,7 +264,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 final success = expenseProvider.currentMonthlyBalance == null
                     ? await expenseProvider.setMonthlyBalance(balance)
                     : await expenseProvider.updateMonthlyBalance(balance);
-                
+
                 if (success) {
                   Navigator.pop(context);
                   ScaffoldMessenger.of(context).showSnackBar(
@@ -296,10 +301,12 @@ class _HomeScreenState extends State<HomeScreen> {
           children: [
             Text('Amount: ₹${transaction.amount.toStringAsFixed(2)}'),
             Text('Category: ${transaction.category}'),
-            Text('Date: ${DateFormat('MMM dd, yyyy').format(transaction.dateTime)}'),
+            Text(
+                'Date: ${DateFormat('MMM dd, yyyy').format(transaction.dateTime)}'),
             Text('Time: ${DateFormat('hh:mm a').format(transaction.dateTime)}'),
             if (transaction.isTiffin)
-              const Text('Type: Tiffin', style: TextStyle(color: Colors.orange)),
+              const Text('Type: Tiffin',
+                  style: TextStyle(color: Colors.orange)),
           ],
         ),
         actions: [
@@ -336,7 +343,7 @@ class _HomeScreenState extends State<HomeScreen> {
               child: _buildFeatureCard(
                 icon: Icons.account_balance_wallet,
                 title: 'Budget',
-                subtitle: budget != null 
+                subtitle: budget != null
                     ? '₹${safeToSpend.toStringAsFixed(0)} safe to spend'
                     : 'Set monthly budget',
                 color: budget != null ? Colors.green : Colors.blue,
@@ -348,7 +355,8 @@ class _HomeScreenState extends State<HomeScreen> {
               child: _buildFeatureCard(
                 icon: Icons.repeat,
                 title: 'Recurring',
-                subtitle: '${expenseProvider.recurringTransactions.length} active',
+                subtitle:
+                    '${expenseProvider.recurringTransactions.length} active',
                 color: Colors.purple,
                 onTap: () => _navigateToRecurring(),
               ),
@@ -362,7 +370,7 @@ class _HomeScreenState extends State<HomeScreen> {
               child: _buildFeatureCard(
                 icon: Icons.analytics,
                 title: 'Insights',
-                subtitle: hasAnomalies 
+                subtitle: hasAnomalies
                     ? '${anomalies.length} alerts'
                     : 'View analytics',
                 color: hasAnomalies ? Colors.orange : Colors.teal,
@@ -435,7 +443,8 @@ class _HomeScreenState extends State<HomeScreen> {
   void _navigateToRecurring() {
     Navigator.push(
       context,
-      MaterialPageRoute(builder: (context) => const RecurringTransactionsScreen()),
+      MaterialPageRoute(
+          builder: (context) => const RecurringTransactionsScreen()),
     );
   }
 
@@ -474,5 +483,3 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 }
-
-

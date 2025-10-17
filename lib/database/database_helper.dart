@@ -4,6 +4,7 @@ import 'package:path/path.dart';
 import '../models/transaction.dart' as models;
 import '../models/category.dart';
 import '../models/monthly_balance.dart';
+import '../models/budget.dart';
 import '../models/shared_budget.dart';
 import '../models/rule.dart';
 import '../utils/security_helper.dart';
@@ -171,7 +172,7 @@ class DatabaseHelper {
         )
       ''');
     }
-    
+
     if (oldVersion < 3) {
       // Create shared_budgets table if not exists
       await db.execute('''
@@ -187,7 +188,7 @@ class DatabaseHelper {
           updatedAt INTEGER NOT NULL
         )
       ''');
-      
+
       // Create activity_feed table if not exists
       await db.execute('''
         CREATE TABLE IF NOT EXISTS activity_feed(
@@ -200,7 +201,7 @@ class DatabaseHelper {
           timestamp INTEGER NOT NULL
         )
       ''');
-      
+
       // Create rules table if not exists
       await db.execute('''
         CREATE TABLE IF NOT EXISTS rules(
@@ -416,6 +417,11 @@ class DatabaseHelper {
         conflictAlgorithm: sqlite.ConflictAlgorithm.replace);
   }
 
+  Future<int> insertBudget(Budget budget) async {
+    final db = await database;
+    return await db.insert('budgets', budget.toMap());
+  }
+
   Future<Map<String, dynamic>?> getBudgetRaw(String monthYear) async {
     final db = await database;
     final res = await db.query('budgets',
@@ -467,7 +473,8 @@ class DatabaseHelper {
 
   Future<int> updateSharedBudget(SharedBudget sharedBudget) async {
     final db = await database;
-    return await db.update('shared_budgets', sharedBudget.toMap(), where: 'id = ?', whereArgs: [sharedBudget.id]);
+    return await db.update('shared_budgets', sharedBudget.toMap(),
+        where: 'id = ?', whereArgs: [sharedBudget.id]);
   }
 
   Future<int> deleteSharedBudget(int id) async {
@@ -500,13 +507,15 @@ class DatabaseHelper {
 
   Future<List<Rule>> getRules() async {
     final db = await database;
-    final List<Map<String, dynamic>> maps = await db.query('rules', orderBy: 'priority DESC');
+    final List<Map<String, dynamic>> maps =
+        await db.query('rules', orderBy: 'priority DESC');
     return List.generate(maps.length, (i) => Rule.fromMap(maps[i]));
   }
 
   Future<int> updateRule(Rule rule) async {
     final db = await database;
-    return await db.update('rules', rule.toMap(), where: 'id = ?', whereArgs: [rule.id]);
+    return await db
+        .update('rules', rule.toMap(), where: 'id = ?', whereArgs: [rule.id]);
   }
 
   Future<int> deleteRule(int id) async {

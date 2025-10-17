@@ -7,10 +7,12 @@ class RecurringTransactionsScreen extends StatefulWidget {
   const RecurringTransactionsScreen({super.key});
 
   @override
-  State<RecurringTransactionsScreen> createState() => _RecurringTransactionsScreenState();
+  State<RecurringTransactionsScreen> createState() =>
+      _RecurringTransactionsScreenState();
 }
 
-class _RecurringTransactionsScreenState extends State<RecurringTransactionsScreen> {
+class _RecurringTransactionsScreenState
+    extends State<RecurringTransactionsScreen> {
   final _nameController = TextEditingController();
   final _amountController = TextEditingController();
   String _selectedCategory = 'Food';
@@ -76,9 +78,12 @@ class _RecurringTransactionsScreenState extends State<RecurringTransactionsScree
                   subtitle: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('₹${recurring.amount.toStringAsFixed(2)} - ${recurring.category}'),
+                      Text(
+                          '₹${recurring.amount.toStringAsFixed(2)} - ${recurring.category}'),
                       Text('Next: ${_formatDate(recurring.nextRunAt)}'),
-                      if (recurring.isTiffin) const Text('🍱 Tiffin', style: TextStyle(color: Colors.orange)),
+                      if (recurring.isTiffin)
+                        const Text('🍱 Tiffin',
+                            style: TextStyle(color: Colors.orange)),
                     ],
                   ),
                   trailing: PopupMenuButton(
@@ -146,7 +151,9 @@ class _RecurringTransactionsScreenState extends State<RecurringTransactionsScree
 
   Widget _buildRecurringDialog({RecurringTransaction? recurring}) {
     return AlertDialog(
-      title: Text(recurring == null ? 'Add Recurring Transaction' : 'Edit Recurring Transaction'),
+      title: Text(recurring == null
+          ? 'Add Recurring Transaction'
+          : 'Edit Recurring Transaction'),
       content: SingleChildScrollView(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -319,7 +326,10 @@ class _RecurringTransactionsScreenState extends State<RecurringTransactionsScree
     if (success) {
       Navigator.of(context).pop();
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(existing == null ? 'Recurring transaction added!' : 'Recurring transaction updated!')),
+        SnackBar(
+            content: Text(existing == null
+                ? 'Recurring transaction added!'
+                : 'Recurring transaction updated!')),
       );
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -333,7 +343,8 @@ class _RecurringTransactionsScreenState extends State<RecurringTransactionsScree
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Delete Recurring Transaction'),
-        content: const Text('Are you sure you want to delete this recurring transaction?'),
+        content: const Text(
+            'Are you sure you want to delete this recurring transaction?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
@@ -342,11 +353,13 @@ class _RecurringTransactionsScreenState extends State<RecurringTransactionsScree
           ElevatedButton(
             onPressed: () async {
               Navigator.of(context).pop();
-              final provider = Provider.of<ExpenseProvider>(context, listen: false);
+              final provider =
+                  Provider.of<ExpenseProvider>(context, listen: false);
               final success = await provider.deleteRecurringTransaction(id);
               if (success) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Recurring transaction deleted')),
+                  const SnackBar(
+                      content: Text('Recurring transaction deleted')),
                 );
               }
             },

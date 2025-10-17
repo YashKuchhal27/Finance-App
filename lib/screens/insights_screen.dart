@@ -36,7 +36,8 @@ class _InsightsScreenState extends State<InsightsScreen> {
                       children: [
                         Row(
                           children: [
-                            Icon(Icons.analytics, color: Theme.of(context).primaryColor),
+                            Icon(Icons.analytics,
+                                color: Theme.of(context).primaryColor),
                             const SizedBox(width: 8),
                             Text(
                               'Monthly Summary',
@@ -65,7 +66,8 @@ class _InsightsScreenState extends State<InsightsScreen> {
                       children: [
                         Row(
                           children: [
-                            Icon(Icons.pie_chart, color: Theme.of(context).primaryColor),
+                            Icon(Icons.pie_chart,
+                                color: Theme.of(context).primaryColor),
                             const SizedBox(width: 8),
                             Text(
                               'Category Breakdown',
@@ -76,9 +78,11 @@ class _InsightsScreenState extends State<InsightsScreen> {
                         const SizedBox(height: 16),
                         if (insights.categoryBreakdown.isNotEmpty) ...[
                           ...insights.categoryBreakdown.entries.map((entry) {
-                            final percentage = (entry.value / insights.totalSpent) * 100;
+                            final percentage =
+                                (entry.value / insights.totalSpent) * 100;
                             return Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 4.0),
+                              padding:
+                                  const EdgeInsets.symmetric(vertical: 4.0),
                               child: Row(
                                 children: [
                                   Expanded(
@@ -123,7 +127,8 @@ class _InsightsScreenState extends State<InsightsScreen> {
                       children: [
                         Row(
                           children: [
-                            Icon(Icons.warning, color: Theme.of(context).primaryColor),
+                            Icon(Icons.warning,
+                                color: Theme.of(context).primaryColor),
                             const SizedBox(width: 8),
                             Text(
                               'Anomaly Detection',
@@ -159,7 +164,8 @@ class _InsightsScreenState extends State<InsightsScreen> {
                               padding: const EdgeInsets.all(12.0),
                               decoration: BoxDecoration(
                                 color: severityColor.withOpacity(0.1),
-                                border: Border.all(color: severityColor.withOpacity(0.3)),
+                                border: Border.all(
+                                    color: severityColor.withOpacity(0.3)),
                                 borderRadius: BorderRadius.circular(8.0),
                               ),
                               child: Row(
@@ -168,7 +174,8 @@ class _InsightsScreenState extends State<InsightsScreen> {
                                   const SizedBox(width: 8),
                                   Expanded(
                                     child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
                                       children: [
                                         Text(
                                           anomaly.description,
@@ -193,7 +200,8 @@ class _InsightsScreenState extends State<InsightsScreen> {
                             padding: const EdgeInsets.all(12.0),
                             decoration: BoxDecoration(
                               color: Colors.green.withOpacity(0.1),
-                              border: Border.all(color: Colors.green.withOpacity(0.3)),
+                              border: Border.all(
+                                  color: Colors.green.withOpacity(0.3)),
                               borderRadius: BorderRadius.circular(8.0),
                             ),
                             child: const Row(
@@ -224,7 +232,8 @@ class _InsightsScreenState extends State<InsightsScreen> {
                       children: [
                         Row(
                           children: [
-                            Icon(Icons.trending_up, color: Theme.of(context).primaryColor),
+                            Icon(Icons.trending_up,
+                                color: Theme.of(context).primaryColor),
                             const SizedBox(width: 8),
                             Text(
                               'Spending Trends',

@@ -42,7 +42,8 @@ class _BudgetScreenState extends State<BudgetScreen> {
           final totalExpenses = provider.getTotalExpenses();
           final remainingBudget = provider.getRemainingBudget();
           final safeToSpend = provider.getSafeToSpend();
-          final isAlert = provider.isBudgetAlertThreshold(_alertThreshold / 100);
+          final isAlert =
+              provider.isBudgetAlertThreshold(_alertThreshold / 100);
 
           return SingleChildScrollView(
             padding: const EdgeInsets.all(16.0),
@@ -62,10 +63,14 @@ class _BudgetScreenState extends State<BudgetScreen> {
                         ),
                         const SizedBox(height: 16),
                         if (budget != null) ...[
-                          _buildBudgetRow('Total Budget', '₹${budget.totalLimit.toStringAsFixed(2)}'),
-                          _buildBudgetRow('Spent', '₹${totalExpenses.toStringAsFixed(2)}'),
-                          _buildBudgetRow('Remaining', '₹${remainingBudget.toStringAsFixed(2)}'),
-                          _buildBudgetRow('Safe to Spend', '₹${safeToSpend.toStringAsFixed(2)}'),
+                          _buildBudgetRow('Total Budget',
+                              '₹${budget.totalLimit.toStringAsFixed(2)}'),
+                          _buildBudgetRow(
+                              'Spent', '₹${totalExpenses.toStringAsFixed(2)}'),
+                          _buildBudgetRow('Remaining',
+                              '₹${remainingBudget.toStringAsFixed(2)}'),
+                          _buildBudgetRow('Safe to Spend',
+                              '₹${safeToSpend.toStringAsFixed(2)}'),
                           const SizedBox(height: 16),
                           LinearProgressIndicator(
                             value: totalExpenses / budget.totalLimit,
@@ -113,7 +118,8 @@ class _BudgetScreenState extends State<BudgetScreen> {
                         const SizedBox(height: 16),
                         SwitchListTile(
                           title: const Text('Enable Rollover'),
-                          subtitle: const Text('Carry unused budget to next month'),
+                          subtitle:
+                              const Text('Carry unused budget to next month'),
                           value: _rolloverEnabled,
                           onChanged: (value) {
                             setState(() {
@@ -196,7 +202,8 @@ class _BudgetScreenState extends State<BudgetScreen> {
                             ),
                             child: Row(
                               children: [
-                                Icon(Icons.check_circle, color: Colors.green[700]),
+                                Icon(Icons.check_circle,
+                                    color: Colors.green[700]),
                                 const SizedBox(width: 8),
                                 Expanded(
                                   child: Text(

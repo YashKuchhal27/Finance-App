@@ -81,11 +81,14 @@ class RecurringTransaction {
         return DateTime(now.year, now.month, now.day + 1);
       case 'weekly':
         final daysUntilNext = (weekday! - now.weekday + 7) % 7;
-        return DateTime(now.year, now.month, now.day + (daysUntilNext == 0 ? 7 : daysUntilNext));
+        return DateTime(now.year, now.month,
+            now.day + (daysUntilNext == 0 ? 7 : daysUntilNext));
       case 'monthly':
         final nextMonth = DateTime(now.year, now.month + 1, 1);
-        final lastDayOfMonth = DateTime(nextMonth.year, nextMonth.month + 1, 0).day;
-        final targetDay = dayOfMonth! > lastDayOfMonth ? lastDayOfMonth : dayOfMonth!;
+        final lastDayOfMonth =
+            DateTime(nextMonth.year, nextMonth.month + 1, 0).day;
+        final targetDay =
+            dayOfMonth! > lastDayOfMonth ? lastDayOfMonth : dayOfMonth!;
         return DateTime(nextMonth.year, nextMonth.month, targetDay);
       default:
         return now.add(const Duration(days: 1));

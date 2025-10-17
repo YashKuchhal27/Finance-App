@@ -3,12 +3,13 @@ import '../models/transaction.dart';
 
 class CsvHelper {
   // Export transactions to CSV
-  static Future<String> exportTransactions(List<Transaction> transactions) async {
+  static Future<String> exportTransactions(
+      List<Transaction> transactions) async {
     final buffer = StringBuffer();
-    
+
     // CSV header
     buffer.writeln('Date,Name,Amount,Category,Is Tiffin,Month Year');
-    
+
     // CSV rows
     for (final transaction in transactions) {
       final date = transaction.dateTime.toIso8601String().split('T')[0];
@@ -17,10 +18,10 @@ class CsvHelper {
       final category = _escapeCsvField(transaction.category);
       final isTiffin = transaction.isTiffin ? 'Yes' : 'No';
       final monthYear = transaction.monthYear;
-      
+
       buffer.writeln('$date,$name,$amount,$category,$isTiffin,$monthYear');
     }
-    
+
     return buffer.toString();
   }
 
@@ -28,23 +29,23 @@ class CsvHelper {
   static List<Transaction> importTransactions(String csvContent) {
     final lines = csvContent.split('\n');
     final transactions = <Transaction>[];
-    
+
     // Skip header line
     for (int i = 1; i < lines.length; i++) {
       final line = lines[i].trim();
       if (line.isEmpty) continue;
-      
+
       try {
         final fields = _parseCsvLine(line);
         if (fields.length < 6) continue;
-        
+
         final date = DateTime.parse(fields[0]);
         final name = _unescapeCsvField(fields[1]);
         final amount = double.parse(fields[2]);
         final category = _unescapeCsvField(fields[3]);
         final isTiffin = fields[4].toLowerCase() == 'yes';
         final monthYear = fields[5];
-        
+
         final transaction = Transaction(
           name: name,
           amount: amount,
@@ -53,14 +54,14 @@ class CsvHelper {
           isTiffin: isTiffin,
           monthYear: monthYear,
         );
-        
+
         transactions.add(transaction);
       } catch (e) {
         // Skip invalid lines
         continue;
       }
     }
-    
+
     return transactions;
   }
 
@@ -95,10 +96,10 @@ class CsvHelper {
     final fields = <String>[];
     final buffer = StringBuffer();
     bool inQuotes = false;
-    
+
     for (int i = 0; i < line.length; i++) {
       final char = line[i];
-      
+
       if (char == '"') {
         if (inQuotes && i + 1 < line.length && line[i + 1] == '"') {
           // Escaped quote
@@ -116,7 +117,7 @@ class CsvHelper {
         buffer.write(char);
       }
     }
-    
+
     // Add last field
     fields.add(buffer.toString());
     return fields;

@@ -4,6 +4,8 @@ import 'package:path/path.dart';
 import '../models/transaction.dart' as models;
 import '../models/category.dart';
 import '../models/monthly_balance.dart';
+import '../models/shared_budget.dart';
+import '../models/rule.dart';
 import '../utils/security_helper.dart';
 
 class DatabaseHelper {
@@ -23,7 +25,7 @@ class DatabaseHelper {
     String path = join(await sqlite.getDatabasesPath(), 'expense_tracker.db');
     return await sqlite.openDatabase(
       path,
-      version: 2,
+      version: 3,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -90,6 +92,49 @@ class DatabaseHelper {
       )
     ''');
 
+    // Create shared_budgets table
+    await db.execute('''
+      CREATE TABLE shared_budgets(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        monthYear TEXT NOT NULL,
+        totalLimit REAL NOT NULL,
+        ownerId TEXT NOT NULL,
+        memberIds TEXT NOT NULL,          -- comma-separated user IDs
+        roles TEXT NOT NULL,              -- comma-separated userId:role pairs
+        createdAt INTEGER NOT NULL,
+        updatedAt INTEGER NOT NULL
+      )
+    ''');
+
+    // Create activity_feed table
+    await db.execute('''
+      CREATE TABLE activity_feed(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        sharedBudgetId TEXT NOT NULL,
+        userId TEXT NOT NULL,
+        action TEXT NOT NULL,
+        description TEXT NOT NULL,
+        metadata TEXT NOT NULL,           -- JSON string
+        timestamp INTEGER NOT NULL
+      )
+    ''');
+
+    // Create rules table
+    await db.execute('''
+      CREATE TABLE rules(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        condition TEXT NOT NULL,
+        conditionValue TEXT NOT NULL,
+        action TEXT NOT NULL,
+        actionValue TEXT NOT NULL,
+        isActive INTEGER NOT NULL DEFAULT 1,
+        priority INTEGER NOT NULL DEFAULT 0,
+        createdAt INTEGER NOT NULL
+      )
+    ''');
+
     // Insert default categories
     await _insertDefaultCategories(db);
   }
@@ -121,6 +166,51 @@ class DatabaseHelper {
           dayOfMonth INTEGER,
           weekday INTEGER,
           nextRunAt INTEGER NOT NULL
+        )
+      ''');
+    }
+    
+    if (oldVersion < 3) {
+      // Create shared_budgets table if not exists
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS shared_budgets(
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          name TEXT NOT NULL,
+          monthYear TEXT NOT NULL,
+          totalLimit REAL NOT NULL,
+          ownerId TEXT NOT NULL,
+          memberIds TEXT NOT NULL,
+          roles TEXT NOT NULL,
+          createdAt INTEGER NOT NULL,
+          updatedAt INTEGER NOT NULL
+        )
+      ''');
+      
+      // Create activity_feed table if not exists
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS activity_feed(
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          sharedBudgetId TEXT NOT NULL,
+          userId TEXT NOT NULL,
+          action TEXT NOT NULL,
+          description TEXT NOT NULL,
+          metadata TEXT NOT NULL,
+          timestamp INTEGER NOT NULL
+        )
+      ''');
+      
+      // Create rules table if not exists
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS rules(
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          name TEXT NOT NULL,
+          condition TEXT NOT NULL,
+          conditionValue TEXT NOT NULL,
+          action TEXT NOT NULL,
+          actionValue TEXT NOT NULL,
+          isActive INTEGER NOT NULL DEFAULT 1,
+          priority INTEGER NOT NULL DEFAULT 0,
+          createdAt INTEGER NOT NULL
         )
       ''');
     }
@@ -359,5 +449,66 @@ class DatabaseHelper {
     final db = await database;
     return await db
         .delete('recurring_transactions', where: 'id = ?', whereArgs: [id]);
+  }
+
+  // Shared Budgets CRUD
+  Future<int> insertSharedBudget(SharedBudget sharedBudget) async {
+    final db = await database;
+    return await db.insert('shared_budgets', sharedBudget.toMap());
+  }
+
+  Future<List<SharedBudget>> getSharedBudgets() async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query('shared_budgets');
+    return List.generate(maps.length, (i) => SharedBudget.fromMap(maps[i]));
+  }
+
+  Future<int> updateSharedBudget(SharedBudget sharedBudget) async {
+    final db = await database;
+    return await db.update('shared_budgets', sharedBudget.toMap(), where: 'id = ?', whereArgs: [sharedBudget.id]);
+  }
+
+  Future<int> deleteSharedBudget(int id) async {
+    final db = await database;
+    return await db.delete('shared_budgets', where: 'id = ?', whereArgs: [id]);
+  }
+
+  // Activity Feed CRUD
+  Future<int> insertActivityFeedItem(ActivityFeedItem item) async {
+    final db = await database;
+    return await db.insert('activity_feed', item.toMap());
+  }
+
+  Future<List<ActivityFeedItem>> getActivityFeed(String sharedBudgetId) async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'activity_feed',
+      where: 'sharedBudgetId = ?',
+      whereArgs: [sharedBudgetId],
+      orderBy: 'timestamp DESC',
+    );
+    return List.generate(maps.length, (i) => ActivityFeedItem.fromMap(maps[i]));
+  }
+
+  // Rules CRUD
+  Future<int> insertRule(Rule rule) async {
+    final db = await database;
+    return await db.insert('rules', rule.toMap());
+  }
+
+  Future<List<Rule>> getRules() async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query('rules', orderBy: 'priority DESC');
+    return List.generate(maps.length, (i) => Rule.fromMap(maps[i]));
+  }
+
+  Future<int> updateRule(Rule rule) async {
+    final db = await database;
+    return await db.update('rules', rule.toMap(), where: 'id = ?', whereArgs: [rule.id]);
+  }
+
+  Future<int> deleteRule(int id) async {
+    final db = await database;
+    return await db.delete('rules', where: 'id = ?', whereArgs: [id]);
   }
 }

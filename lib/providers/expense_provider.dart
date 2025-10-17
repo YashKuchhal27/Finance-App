@@ -5,6 +5,10 @@ import '../models/monthly_balance.dart';
 import '../database/database_helper.dart';
 import '../models/budget.dart';
 import '../models/recurring_transaction.dart';
+import '../models/shared_budget.dart';
+import '../models/rule.dart';
+import '../services/sync_service.dart';
+import '../services/ml_service.dart';
 
 class ExpenseProvider with ChangeNotifier {
   final DatabaseHelper _databaseHelper = DatabaseHelper();
@@ -16,6 +20,9 @@ class ExpenseProvider with ChangeNotifier {
   bool _isLoading = false;
   Budget? _currentBudget;
   List<RecurringTransaction> _recurringTransactions = [];
+  List<SharedBudget> _sharedBudgets = [];
+  List<Rule> _rules = [];
+  List<ActivityFeedItem> _activityFeed = [];
 
   // Getters
   List<Transaction> get transactions => _transactions;
@@ -24,7 +31,11 @@ class ExpenseProvider with ChangeNotifier {
   String get currentMonthYear => _currentMonthYear;
   bool get isLoading => _isLoading;
   Budget? get currentBudget => _currentBudget;
-  List<RecurringTransaction> get recurringTransactions => _recurringTransactions;
+  List<RecurringTransaction> get recurringTransactions =>
+      _recurringTransactions;
+  List<SharedBudget> get sharedBudgets => _sharedBudgets;
+  List<Rule> get rules => _rules;
+  List<ActivityFeedItem> get activityFeed => _activityFeed;
 
   // Initialize the provider
   Future<void> initialize() async {
@@ -38,6 +49,10 @@ class ExpenseProvider with ChangeNotifier {
     await _loadBudget();
     await _loadRecurringTransactions();
     await _processRecurringTransactions();
+    await _loadSharedBudgets();
+    await _loadRules();
+    await _loadActivityFeed();
+    await _syncWithCloud();
 
     _isLoading = false;
     notifyListeners();
@@ -72,15 +87,18 @@ class ExpenseProvider with ChangeNotifier {
 
   Future<void> _loadRecurringTransactions() async {
     final rawList = await _databaseHelper.getRecurringAll();
-    _recurringTransactions = rawList.map((map) => RecurringTransaction.fromMap(map)).toList();
+    _recurringTransactions =
+        rawList.map((map) => RecurringTransaction.fromMap(map)).toList();
   }
 
   Future<void> _processRecurringTransactions() async {
     final now = DateTime.now();
-    final currentMonthYear = '${now.year}-${now.month.toString().padLeft(2, '0')}';
-    
+    final currentMonthYear =
+        '${now.year}-${now.month.toString().padLeft(2, '0')}';
+
     for (final recurring in _recurringTransactions) {
-      if (recurring.nextRunAt.isBefore(now) || recurring.nextRunAt.isAtSameMomentAs(now)) {
+      if (recurring.nextRunAt.isBefore(now) ||
+          recurring.nextRunAt.isAtSameMomentAs(now)) {
         // Create transaction for this month
         final transaction = Transaction(
           name: recurring.name,
@@ -90,15 +108,17 @@ class ExpenseProvider with ChangeNotifier {
           isTiffin: recurring.isTiffin,
           monthYear: currentMonthYear,
         );
-        
+
         await addTransaction(transaction);
-        
+
         // Update next run date
-        final updatedRecurring = recurring.copyWith(nextRunAt: recurring.calculateNextRun());
-        await _databaseHelper.updateRecurring(updatedRecurring.toMap(), recurring.id!);
+        final updatedRecurring =
+            recurring.copyWith(nextRunAt: recurring.calculateNextRun());
+        await _databaseHelper.updateRecurring(
+            updatedRecurring.toMap(), recurring.id!);
       }
     }
-    
+
     // Reload recurring transactions to get updated next run dates
     await _loadRecurringTransactions();
   }
@@ -310,7 +330,8 @@ class ExpenseProvider with ChangeNotifier {
     }
   }
 
-  Future<bool> updateRecurringTransaction(RecurringTransaction recurring) async {
+  Future<bool> updateRecurringTransaction(
+      RecurringTransaction recurring) async {
     try {
       await _databaseHelper.updateRecurring(recurring.toMap(), recurring.id!);
       await _loadRecurringTransactions();
@@ -325,6 +346,176 @@ class ExpenseProvider with ChangeNotifier {
     try {
       await _databaseHelper.deleteRecurring(id);
       await _loadRecurringTransactions();
+      notifyListeners();
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  // Phase 2: Cloud Sync, Shared Budgets, Rules, ML
+  Future<void> _loadSharedBudgets() async {
+    _sharedBudgets = await _databaseHelper.getSharedBudgets();
+  }
+
+  Future<void> _loadRules() async {
+    _rules = await _databaseHelper.getRules();
+    RuleEngine.loadRules(_rules);
+  }
+
+  Future<void> _loadActivityFeed() async {
+    // Load activity feed for current month's shared budgets
+    _activityFeed = [];
+    for (final budget in _sharedBudgets) {
+      if (budget.monthYear == _currentMonthYear) {
+        final feed = await _databaseHelper.getActivityFeed(budget.id.toString());
+        _activityFeed.addAll(feed);
+      }
+    }
+    _activityFeed.sort((a, b) => b.timestamp.compareTo(a.timestamp));
+  }
+
+  Future<void> _syncWithCloud() async {
+    if (await SyncService.isSyncNeeded()) {
+      try {
+        // Sync to cloud
+        await SyncService.syncToCloud(
+          transactions: _transactions,
+          categories: _categories,
+          monthlyBalances: _currentMonthlyBalance != null ? [_currentMonthlyBalance!] : [],
+          budgets: _currentBudget != null ? [_currentBudget!] : [],
+          recurringTransactions: _recurringTransactions,
+        );
+
+        // Sync from cloud
+        final cloudData = await SyncService.syncFromCloud();
+        if (cloudData != null) {
+          // Apply cloud data with conflict resolution
+          await _applyCloudData(cloudData);
+        }
+      } catch (e) {
+        // Sync failed, continue with local data
+      }
+    }
+  }
+
+  Future<void> _applyCloudData(Map<String, dynamic> cloudData) async {
+    // This would merge cloud data with local data
+    // For now, just reload local data
+    await _loadCurrentMonthData();
+    await _loadBudget();
+    await _loadRecurringTransactions();
+  }
+
+  // ML Auto-categorization
+  String suggestCategory(Transaction transaction) {
+    return MLService.suggestCategory(transaction, _categories);
+  }
+
+  List<Anomaly> detectAnomalies() {
+    return MLService.detectAnomalies(_transactions);
+  }
+
+  MonthlyInsights generateMonthlyInsights() {
+    final previousMonth = DateTime.now().subtract(const Duration(days: 30));
+    final previousMonthYear = '${previousMonth.year}-${previousMonth.month.toString().padLeft(2, '0')}';
+    final previousTransactions = _transactions.where((t) => t.monthYear == previousMonthYear).toList();
+    
+    return MLService.generateMonthlyInsights(
+      _transactions,
+      _currentMonthlyBalance?.initialBalance ?? 0.0,
+      previousTransactions,
+    );
+  }
+
+  // Rules Engine
+  Future<bool> addRule(Rule rule) async {
+    try {
+      await _databaseHelper.insertRule(rule);
+      await _loadRules();
+      notifyListeners();
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  Future<bool> updateRule(Rule rule) async {
+    try {
+      await _databaseHelper.updateRule(rule);
+      await _loadRules();
+      notifyListeners();
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  Future<bool> deleteRule(int id) async {
+    try {
+      await _databaseHelper.deleteRule(id);
+      await _loadRules();
+      notifyListeners();
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  // Apply rules to a transaction before adding
+  Transaction applyRules(Transaction transaction) {
+    final transactionData = transaction.toMap();
+    final processedData = RuleEngine.processTransaction(transactionData);
+    return Transaction.fromMap(processedData);
+  }
+
+  // Shared Budgets
+  Future<bool> createSharedBudget({
+    required String name,
+    required double totalLimit,
+    required String ownerId,
+    required List<String> memberIds,
+  }) async {
+    try {
+      final sharedBudget = SharedBudget(
+        name: name,
+        monthYear: _currentMonthYear,
+        totalLimit: totalLimit,
+        ownerId: ownerId,
+        memberIds: memberIds,
+        roles: {ownerId: 'owner'}..addAll(Map.fromEntries(memberIds.map((id) => MapEntry(id, 'member')))),
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+      );
+      
+      await _databaseHelper.insertSharedBudget(sharedBudget);
+      await _loadSharedBudgets();
+      notifyListeners();
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  Future<bool> addActivityFeedItem({
+    required String sharedBudgetId,
+    required String userId,
+    required String action,
+    required String description,
+    required Map<String, dynamic> metadata,
+  }) async {
+    try {
+      final item = ActivityFeedItem(
+        sharedBudgetId: sharedBudgetId,
+        userId: userId,
+        action: action,
+        description: description,
+        metadata: metadata,
+        timestamp: DateTime.now(),
+      );
+      
+      await _databaseHelper.insertActivityFeedItem(item);
+      await _loadActivityFeed();
       notifyListeners();
       return true;
     } catch (e) {

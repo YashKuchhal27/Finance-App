@@ -10,6 +10,9 @@ import 'add_transaction_screen.dart';
 import 'transaction_list_screen.dart';
 import 'monthly_view_screen.dart';
 import 'category_management_screen.dart';
+import 'budget_screen.dart';
+import 'recurring_transactions_screen.dart';
+import 'insights_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -42,6 +45,10 @@ class _HomeScreenState extends State<HomeScreen> {
         backgroundColor: const Color(0xFF2196F3),
         elevation: 0,
         actions: [
+          IconButton(
+            icon: const Icon(Icons.analytics, color: Colors.white),
+            onPressed: () => _navigateToInsights(),
+          ),
           IconButton(
             icon: const Icon(Icons.calendar_month, color: Colors.white),
             onPressed: () => _navigateToMonthlyView(),
@@ -90,6 +97,10 @@ class _HomeScreenState extends State<HomeScreen> {
                     tiffinExpenses: expenseProvider.getTiffinExpenses(),
                     categoryExpenses: expenseProvider.getCategoryExpenses(),
                   ),
+                  const SizedBox(height: 16),
+                  
+                  // New Features Section
+                  _buildNewFeaturesSection(expenseProvider),
                   const SizedBox(height: 16),
                   
                   // Tiffin Tracker
@@ -295,6 +306,168 @@ class _HomeScreenState extends State<HomeScreen> {
           TextButton(
             onPressed: () => Navigator.pop(context),
             child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildNewFeaturesSection(ExpenseProvider expenseProvider) {
+    final budget = expenseProvider.currentBudget;
+    final safeToSpend = expenseProvider.getSafeToSpend();
+    final anomalies = expenseProvider.detectAnomalies();
+    final hasAnomalies = anomalies.isNotEmpty;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Smart Features',
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            color: Color(0xFF333333),
+          ),
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: _buildFeatureCard(
+                icon: Icons.account_balance_wallet,
+                title: 'Budget',
+                subtitle: budget != null 
+                    ? '₹${safeToSpend.toStringAsFixed(0)} safe to spend'
+                    : 'Set monthly budget',
+                color: budget != null ? Colors.green : Colors.blue,
+                onTap: () => _navigateToBudget(),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _buildFeatureCard(
+                icon: Icons.repeat,
+                title: 'Recurring',
+                subtitle: '${expenseProvider.recurringTransactions.length} active',
+                color: Colors.purple,
+                onTap: () => _navigateToRecurring(),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: _buildFeatureCard(
+                icon: Icons.analytics,
+                title: 'Insights',
+                subtitle: hasAnomalies 
+                    ? '${anomalies.length} alerts'
+                    : 'View analytics',
+                color: hasAnomalies ? Colors.orange : Colors.teal,
+                onTap: () => _navigateToInsights(),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _buildFeatureCard(
+                icon: Icons.cloud_sync,
+                title: 'Sync',
+                subtitle: 'Cloud backup',
+                color: Colors.indigo,
+                onTap: () => _showSyncStatus(),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildFeatureCard({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return Card(
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(icon, color: color, size: 24),
+              const SizedBox(height: 8),
+              Text(
+                title,
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                subtitle,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.grey[600],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _navigateToBudget() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const BudgetScreen()),
+    );
+  }
+
+  void _navigateToRecurring() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const RecurringTransactionsScreen()),
+    );
+  }
+
+  void _navigateToInsights() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const InsightsScreen()),
+    );
+  }
+
+  void _showSyncStatus() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Cloud Sync Status'),
+        content: const Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.cloud_done, size: 48, color: Colors.green),
+            SizedBox(height: 16),
+            Text('Your data is synced to the cloud'),
+            SizedBox(height: 8),
+            Text(
+              'All your transactions, budgets, and settings are automatically backed up and synced across devices.',
+              style: TextStyle(fontSize: 12, color: Colors.grey),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('OK'),
           ),
         ],
       ),

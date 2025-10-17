@@ -318,6 +318,23 @@ class ExpenseProvider with ChangeNotifier {
     return used >= thresholdPercent;
   }
 
+  // Budget management methods
+  Future<bool> insertBudget(Budget budget) async {
+    try {
+      await _databaseHelper.insertBudget(budget);
+      await _loadBudget();
+      notifyListeners();
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  double getRemainingBudget() {
+    if (_currentBudget == null) return 0.0;
+    return _currentBudget!.totalLimit - getTotalExpenses();
+  }
+
   // Recurring transactions API
   Future<bool> addRecurringTransaction(RecurringTransaction recurring) async {
     try {
@@ -368,7 +385,8 @@ class ExpenseProvider with ChangeNotifier {
     _activityFeed = [];
     for (final budget in _sharedBudgets) {
       if (budget.monthYear == _currentMonthYear) {
-        final feed = await _databaseHelper.getActivityFeed(budget.id.toString());
+        final feed =
+            await _databaseHelper.getActivityFeed(budget.id.toString());
         _activityFeed.addAll(feed);
       }
     }
@@ -382,7 +400,8 @@ class ExpenseProvider with ChangeNotifier {
         await SyncService.syncToCloud(
           transactions: _transactions,
           categories: _categories,
-          monthlyBalances: _currentMonthlyBalance != null ? [_currentMonthlyBalance!] : [],
+          monthlyBalances:
+              _currentMonthlyBalance != null ? [_currentMonthlyBalance!] : [],
           budgets: _currentBudget != null ? [_currentBudget!] : [],
           recurringTransactions: _recurringTransactions,
         );
@@ -418,9 +437,11 @@ class ExpenseProvider with ChangeNotifier {
 
   MonthlyInsights generateMonthlyInsights() {
     final previousMonth = DateTime.now().subtract(const Duration(days: 30));
-    final previousMonthYear = '${previousMonth.year}-${previousMonth.month.toString().padLeft(2, '0')}';
-    final previousTransactions = _transactions.where((t) => t.monthYear == previousMonthYear).toList();
-    
+    final previousMonthYear =
+        '${previousMonth.year}-${previousMonth.month.toString().padLeft(2, '0')}';
+    final previousTransactions =
+        _transactions.where((t) => t.monthYear == previousMonthYear).toList();
+
     return MLService.generateMonthlyInsights(
       _transactions,
       _currentMonthlyBalance?.initialBalance ?? 0.0,
@@ -483,11 +504,12 @@ class ExpenseProvider with ChangeNotifier {
         totalLimit: totalLimit,
         ownerId: ownerId,
         memberIds: memberIds,
-        roles: {ownerId: 'owner'}..addAll(Map.fromEntries(memberIds.map((id) => MapEntry(id, 'member')))),
+        roles: {ownerId: 'owner'}..addAll(
+            Map.fromEntries(memberIds.map((id) => MapEntry(id, 'member')))),
         createdAt: DateTime.now(),
         updatedAt: DateTime.now(),
       );
-      
+
       await _databaseHelper.insertSharedBudget(sharedBudget);
       await _loadSharedBudgets();
       notifyListeners();
@@ -513,7 +535,7 @@ class ExpenseProvider with ChangeNotifier {
         metadata: metadata,
         timestamp: DateTime.now(),
       );
-      
+
       await _databaseHelper.insertActivityFeedItem(item);
       await _loadActivityFeed();
       notifyListeners();

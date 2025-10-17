@@ -3,6 +3,7 @@ class Budget {
   final String monthYear; // e.g., 2025-10
   final double totalLimit;
   final bool rolloverEnabled;
+  final double alertThreshold; // Percentage (0.0 to 1.0)
   final DateTime createdAt;
 
   Budget({
@@ -10,6 +11,7 @@ class Budget {
     required this.monthYear,
     required this.totalLimit,
     this.rolloverEnabled = true,
+    this.alertThreshold = 0.8, // Default 80%
     required this.createdAt,
   });
 
@@ -19,6 +21,7 @@ class Budget {
       'monthYear': monthYear,
       'totalLimit': totalLimit,
       'rolloverEnabled': rolloverEnabled ? 1 : 0,
+      'alertThreshold': alertThreshold,
       'createdAt': createdAt.millisecondsSinceEpoch,
     };
   }
@@ -29,6 +32,7 @@ class Budget {
       monthYear: map['monthYear'] as String,
       totalLimit: (map['totalLimit'] as num).toDouble(),
       rolloverEnabled: (map['rolloverEnabled'] as int) == 1,
+      alertThreshold: (map['alertThreshold'] as num?)?.toDouble() ?? 0.8,
       createdAt: DateTime.fromMillisecondsSinceEpoch(map['createdAt'] as int),
     );
   }
@@ -38,6 +42,7 @@ class Budget {
     String? monthYear,
     double? totalLimit,
     bool? rolloverEnabled,
+    double? alertThreshold,
     DateTime? createdAt,
   }) {
     return Budget(
@@ -45,6 +50,7 @@ class Budget {
       monthYear: monthYear ?? this.monthYear,
       totalLimit: totalLimit ?? this.totalLimit,
       rolloverEnabled: rolloverEnabled ?? this.rolloverEnabled,
+      alertThreshold: alertThreshold ?? this.alertThreshold,
       createdAt: createdAt ?? this.createdAt,
     );
   }

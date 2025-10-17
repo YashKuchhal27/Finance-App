@@ -73,6 +73,7 @@ class DatabaseHelper {
         monthYear TEXT NOT NULL UNIQUE,
         totalLimit REAL NOT NULL,
         rolloverEnabled INTEGER NOT NULL DEFAULT 1,
+        alertThreshold REAL NOT NULL DEFAULT 0.8,
         createdAt INTEGER NOT NULL
       )
     ''');
@@ -151,6 +152,7 @@ class DatabaseHelper {
           monthYear TEXT NOT NULL UNIQUE,
           totalLimit REAL NOT NULL,
           rolloverEnabled INTEGER NOT NULL DEFAULT 1,
+          alertThreshold REAL NOT NULL DEFAULT 0.8,
           createdAt INTEGER NOT NULL
         )
       ''');
